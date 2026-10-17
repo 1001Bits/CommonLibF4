@@ -16,12 +16,34 @@ namespace REL
 		auto  sz = _filename.size();
 		void* handle = nullptr;
 		_filename.resize(getFilename());
+
+		// If environment-based retrieval failed or returned unexpected size,
+		// try to find the module using the current process filename. This
+		// helps launchers/renamers (like replacing Fallout4VR.exe with a
+		// launcher) to still resolve the running executable correctly.
 		if (_filename.empty() || _filename.size() != sz) {
-			for (auto& runtime : RUNTIMES) {
-				_filename = runtime;
+			// Try current process filename first
+			std::wstring currentName;
+			currentName.resize(REX::W32::MAX_PATH);
+			const auto len = REX::W32::GetModuleFileNameW(nullptr, currentName.data(), static_cast<std::uint32_t>(currentName.size()));
+			if (len > 0 && len < currentName.size()) {
+				// extract just the filename portion
+				const auto pos = currentName.find_last_of(L"\\/");
+				if (pos != std::wstring::npos) {
+					currentName = currentName.substr(pos + 1);
+				}
+				_filename = currentName;
 				handle = REX::W32::GetModuleHandleW(_filename.c_str());
-				if (handle) {
-					break;
+			}
+
+			// If that didn't work, fall back to checking known runtime names
+			if (!handle) {
+				for (auto& runtime : RUNTIMES) {
+					_filename = runtime;
+					handle = REX::W32::GetModuleHandleW(_filename.c_str());
+					if (handle) {
+						break;
+					}
 				}
 			}
 		}

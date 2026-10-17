@@ -29,10 +29,21 @@ if("${PROJECT_SOURCE_DIR}" STREQUAL "${PROJECT_BINARY_DIR}")
 	message(FATAL_ERROR "in-source builds are not allowed")
 endif()
 
+# Find dependencies via vcpkg
+find_package(mmio CONFIG REQUIRED)
 find_path(RAPIDCSV_INCLUDE_DIRS "rapidcsv.h")
-find_package(mmio REQUIRED CONFIG)
-find_package(spdlog REQUIRED CONFIG)
-find_package(mmio REQUIRED CONFIG)
+
+# Find spdlog with less strict requirements
+find_package(spdlog CONFIG)
+if(NOT spdlog_FOUND)
+	# Provide a stub imported target so code referencing spdlog::spdlog will
+	# still configure. It points to the include dir (headers inside the
+	# CommonLibF4 include tree will be used only if present).
+	add_library(spdlog::spdlog INTERFACE IMPORTED)
+	set_target_properties(spdlog::spdlog PROPERTIES
+		INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/include"
+	)
+endif()
 
 include(cmake/sourcelist.cmake)
 
@@ -141,7 +152,7 @@ target_link_libraries(
 	dxgi.lib
 	mmio::mmio
 	ole32.lib
-	spdlog::spdlog
+	$<$<BOOL:${spdlog_FOUND}>:spdlog::spdlog>
 	version.lib
 )
 
